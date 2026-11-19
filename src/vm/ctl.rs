@@ -42,7 +42,7 @@ pub fn linear_pc(bits: u32, regs: &[(String, u128)]) -> u64 {
     let get = |n: &str| regs.iter().find(|(k, _)| k == n).map_or(0, |(_, v)| *v as u64);
     match (bits, get("cs"), get("rip")) {
         (16, 0xf000, 0xfff0) => 0xffff_fff0,
-        (16, cs, ip) => (cs << 4).wrapping_add(ip & 0xffff),
+        (16, cs, ip) => (cs << 4).wrapping_add(ip & 0xffff_ffff), // 32-bit ip: SMM and unreal mode run 16-bit code with 4 GiB limits
         (_, _, ip) => ip,
     }
 }
@@ -329,6 +329,8 @@ mod tests {
         let r = regs(&[("cs", 0xf000), ("rip", 0xfff0)]);
         assert_eq!(linear_pc(16, &r), 0xffff_fff0);
         assert_eq!(linear_pc(16, &regs(&[("cs", 0), ("rip", 0x7c00)])), 0x7c00);
+        // regression (found stepping SMM): SMBASE 0x30000 + ip 0x812670 was truncated to 0x32670
+        assert_eq!(linear_pc(16, &regs(&[("cs", 0x3000), ("rip", 0x81_2670)])), 0x84_2670);
         assert_eq!(linear_pc(32, &regs(&[("cs", 8), ("rip", 0x100000)])), 0x100000);
     }
 }

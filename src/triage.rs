@@ -119,6 +119,11 @@ pub struct CpuSample {
 }
 
 /// One CPU's state from HMP `info registers`. x86 also yields HLT and EFLAGS.IF; others only the PC.
+/// True when an x86 `info registers` dump says the CPU is executing in System Management Mode.
+pub fn dump_in_smm(dump: &str) -> bool {
+    dump.contains(" SMM=1")
+}
+
 pub fn parse_cpu_sample(dump: &str) -> Option<CpuSample> {
     static PC: OnceLock<Regex> = OnceLock::new();
     static HLT: OnceLock<Regex> = OnceLock::new();
@@ -223,6 +228,12 @@ mod tests {
         assert_eq!(classify_hang(&[s(1, Some(true), Some(true)), s(1, Some(true), Some(true))]).class, "idle");
         assert_eq!(classify_hang(&[s(1, Some(false), Some(true)), s(1, Some(false), Some(true))]).class, "spin");
         assert_eq!(classify_hang(&[s(1, None, None), s(2, None, None)]).class, "alive");
+    }
+
+    #[test]
+    fn smm_flag_read_from_dump() {
+        assert!(dump_in_smm("RIP=0 RFL=2 [-------] CPL=0 II=0 A20=1 SMM=1 HLT=0"));
+        assert!(!dump_in_smm("RIP=0 RFL=2 [-------] CPL=0 II=0 A20=1 SMM=0 HLT=0"));
     }
 
     #[test]

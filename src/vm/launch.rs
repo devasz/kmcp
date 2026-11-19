@@ -44,6 +44,9 @@ pub struct LaunchSpec {
     /// Add a pvpanic device so guest panics raise GUEST_PANICKED.
     #[serde(default)]
     pub pvpanic: bool,
+    /// x86 only: enable SMM with SMRAM-protected pflash, which SMM-capable firmware (OVMF_CODE.secboot) needs to boot.
+    #[serde(default)]
+    pub smm: bool,
     /// x86 only: capture the 0x402 debug console (SeaBIOS/OVMF debug output).
     #[serde(default)]
     pub debugcon: bool,
@@ -108,7 +111,14 @@ fn machine_args(spec: &LaunchSpec, arch: &str) -> Res<Vec<String>> {
     let accel = one_of("accel", spec.accel.as_deref().unwrap_or("tcg"), &["tcg", "kvm"])?;
     let default_machine = if arch == "x86_64" { "pc" } else { "virt" };
     let machine = ident("machine", spec.machine.as_deref().unwrap_or(default_machine))?;
+    if spec.smm && arch != "x86_64" {
+        return Err("smm is x86 only".into());
+    }
+    let machine = if spec.smm { format!("{machine},smm=on") } else { machine };
     let mut args = vec!["-machine".into(), machine, "-accel".into(), accel];
+    if spec.smm {
+        args.extend(["-global".into(), "driver=cfi.pflash01,property=secure,value=on".into()]);
+    }
     let cpu = spec.cpu.as_deref().or(if arch == "aarch64" { Some("cortex-a57") } else { None });
     if let Some(cpu) = cpu {
         args.extend(["-cpu".into(), ident("cpu", cpu)?]);
@@ -280,6 +290,15 @@ mod tests {
         let drives: Vec<_> = argv.iter().filter(|a| a.contains("if=pflash")).collect();
         assert_eq!(drives.len(), 2);
         assert!(drives[0].contains("readonly=on") && !drives[1].contains("readonly=on"));
+    }
+
+    #[test]
+    fn smm_launch_enables_smm_with_secure_flash_on_x86_only() {
+        let spec = LaunchSpec { machine: Some("q35".into()), smm: true, ..Default::default() };
+        let argv = build(&spec, &dir()).unwrap().argv.join(" ");
+        assert!(argv.contains("-machine q35,smm=on") && argv.contains("driver=cfi.pflash01,property=secure,value=on"), "{argv}");
+        assert!(!build(&LaunchSpec::default(), &dir()).unwrap().argv.join(" ").contains("smm"));
+        assert!(build(&LaunchSpec { arch: Some("riscv64".into()), smm: true, ..Default::default() }, &dir()).is_err());
     }
 
     #[test]

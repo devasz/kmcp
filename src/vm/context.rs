@@ -51,7 +51,17 @@ async fn register_view(vm: &Vm, out: &mut Map<String, Value>) -> Option<(u32, u6
     if linear != pc {
         out.insert("linear_pc".into(), json!(hex(linear as u128)));
     }
+    if vm.arch == "x86_64" && in_smm(vm).await {
+        out.insert("smm".into(), json!(true)); // only present when true: SMRAM code is invisible to the OS
+    }
     Some((bits, linear))
+}
+
+async fn in_smm(vm: &Vm) -> bool {
+    match vm.qmp() {
+        Ok(qmp) => qmp.hmp("info registers").await.is_ok_and(|dump| crate::triage::dump_in_smm(&dump)),
+        Err(_) => false,
+    }
 }
 
 async fn code_view(vm: &Vm, out: &mut Map<String, Value>, bits: u32, linear: u64) {

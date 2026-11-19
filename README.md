@@ -44,6 +44,10 @@ Every stop returns one bundle: regs, symbol, code at PC, new serial text, new QM
 - **Launch shapes** (`vm_launch`): `drives[].interface` is `virtio`, `ide`, `pflash` (OVMF code/vars, in order) or
   `virtio-mmio` (non-x86 `virt`: becomes `virtio-blk-device` on `virtio-mmio-bus.N`, modern virtio forced). `bios: "none"`
   boots a bare-metal `-kernel` with no firmware. `elf` loads DWARF; asm labels (`NOTYPE`, e.g. `_entry`) are symbols too.
+- **SMM (Ring -2)**: `smm: true` (x86, `machine: "q35"`) enables SMM with SMRAM-protected pflash so SMM-capable firmware
+  (`OVMF_CODE.secboot`) boots. A hardware breakpoint at `0x38000` (default SMBASE `0x30000` + `0x8000`) stops on the first SMI,
+  before firmware relocates SMBASE; stop contexts carry `"smm": true` (only when true), `mem` and `step` work inside SMRAM.
+  Emulation only: QEMU's SMM is not a vendor chipset, and real-hardware SMM work (smm-mapper, flashing BIOS) still needs a second machine.
 - **Attach** (`vm_attach`): needs QEMU started with `-gdb`/`-qmp`/serial sockets. `detach` resumes nothing and never kills the
   external QEMU; `kill` is refused.
 - **Safety**: argv arrays only (no shell), validated paths, per-op timeouts, bounded ring buffers. QEMU dies with the MCP:
@@ -56,9 +60,10 @@ Every stop returns one bundle: regs, symbol, code at PC, new serial text, new QM
 ## Verify
 
 ```
-cargo test                                   # 44 unit tests
+cargo test                                   # 46 unit tests
 python3 scripts/demo.py [binary] [t1..t5 gates]   # live E2E + benchmarks, needs nasm, qemu x86_64/aarch64/riscv64
 python3 scripts/dogfood_ovmf.py [binary]          # stock edk2-ovmf: pflash, 4 GiB reset vector, real->long mode, UEFI shell
+python3 scripts/dogfood_smm.py [binary]           # stock SMM-capable OVMF: catch the first SMI out-of-band, step inside SMRAM
 python3 scripts/dogfood_xv6.py <xv6-riscv clone> [binary]   # real kernel (clang+lld, no riscv GCC needed), + broken-boot proof
 ```
 `demo.py` reproduces: T1 reset-vector → boot sector (breakpoint, step, serial regex), T2 triple fault / hang / pvpanic /
