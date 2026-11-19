@@ -15,6 +15,8 @@ pub struct Drive {
     /// ide, virtio, sd, scsi, floppy or none; omitted = QEMU default for the machine.
     pub interface: Option<String>,
     pub readonly: Option<bool>,
+    /// Present the image as an ATAPI CD-ROM (installer ISOs; UEFI firmware only boots El Torito from a CD-ROM).
+    pub cdrom: Option<bool>,
 }
 
 #[derive(Deserialize, JsonSchema, Default, Clone)]
@@ -158,6 +160,9 @@ fn drive_args(d: &Drive, index: usize) -> Res<Vec<String>> {
     if d.readonly == Some(true) {
         opt += ",readonly=on";
     }
+    if d.cdrom == Some(true) {
+        opt += ",media=cdrom";
+    }
     let mut args = vec!["-drive".into(), opt];
     if mmio {
         args.extend(["-device".into(), format!("virtio-blk-device,drive=mmio{index},bus=virtio-mmio-bus.{index}")]);
@@ -282,9 +287,15 @@ mod tests {
     }
 
     #[test]
+    fn cdrom_drive_gets_media_cdrom() {
+        let iso = Drive { file: "/dev/null".into(), interface: Some("ide".into()), readonly: Some(true), cdrom: Some(true), ..Default::default() };
+        assert!(drive_args(&iso, 0).unwrap().join(" ").contains("if=ide,readonly=on,media=cdrom"));
+    }
+
+    #[test]
     fn pflash_drives_are_accepted_in_order() {
         // regression (found booting OVMF): `pflash` was not an allowed drive interface
-        let flash = |readonly| Drive { file: "/dev/null".into(), format: None, interface: Some("pflash".into()), readonly: Some(readonly) };
+        let flash = |readonly| Drive { file: "/dev/null".into(), format: None, interface: Some("pflash".into()), readonly: Some(readonly), cdrom: None };
         let spec = LaunchSpec { drives: vec![flash(true), flash(false)], ..Default::default() };
         let argv = build(&spec, &dir()).unwrap().argv;
         let drives: Vec<_> = argv.iter().filter(|a| a.contains("if=pflash")).collect();
@@ -313,7 +324,7 @@ mod tests {
     #[test]
     fn virtio_mmio_drive_becomes_blk_device_on_the_first_bus() {
         // regression (found launching xv6-riscv): `if=virtio` is virtio-blk-PCI on `virt`, but xv6 probes virtio-mmio at 0x10001000
-        let drive = Drive { file: "/dev/null".into(), format: None, interface: Some("virtio-mmio".into()), readonly: None };
+        let drive = Drive { file: "/dev/null".into(), format: None, interface: Some("virtio-mmio".into()), readonly: None, cdrom: None };
         let spec = LaunchSpec { arch: Some("riscv64".into()), drives: vec![drive], ..Default::default() };
         let argv = build(&spec, &dir()).unwrap().argv.join(" ");
         assert!(argv.contains("file=/dev/null,format=raw,if=none,id=mmio0"), "{argv}");

@@ -42,7 +42,7 @@ Every stop returns one bundle: regs, symbol, code at PC, new serial text, new QM
 - **Breakpoints**: QEMU's stub re-reports a breakpoint at the resume PC, so `continue` single-steps off it first
   (breakpoint lifted, one IRQ-free step, reinserted), as gdb does.
 - **Launch shapes** (`vm_launch`): `drives[].interface` is `virtio`, `ide`, `pflash` (OVMF code/vars, in order) or
-  `virtio-mmio` (non-x86 `virt`: becomes `virtio-blk-device` on `virtio-mmio-bus.N`, modern virtio forced). `bios: "none"`
+  `virtio-mmio` (non-x86 `virt`: becomes `virtio-blk-device` on `virtio-mmio-bus.N`, modern virtio forced). `cdrom: true` attaches an image as an ATAPI CD-ROM (installer ISOs; UEFI boots El Torito only from one). `bios: "none"`
   boots a bare-metal `-kernel` with no firmware. `elf` loads DWARF; asm labels (`NOTYPE`, e.g. `_entry`) are symbols too.
 - **SMM (Ring -2)**: `smm: true` (x86, `machine: "q35"`) enables SMM with SMRAM-protected pflash so SMM-capable firmware
   (`OVMF_CODE.secboot`) boots. A hardware breakpoint at `0x38000` (default SMBASE `0x30000` + `0x8000`) stops on the first SMI,
