@@ -68,6 +68,8 @@ python3 scripts/demo.py [binary] [t1..t5 gates]   # live E2E + benchmarks, needs
 python3 scripts/dogfood_ovmf.py [binary]          # stock edk2-ovmf: pflash, 4 GiB reset vector, real->long mode, UEFI shell
 python3 scripts/dogfood_smm.py [binary]           # stock SMM-capable OVMF: catch the first SMI out-of-band, step inside SMRAM
 python3 scripts/dogfood_svm.py [binary]           # AMD SVM hypervisor fixture: VMRUN/#VMEXIT, live VMCB edit
+python3 scripts/stress_parallel.py [binary] [vms] [iters]   # 10 VMs, 10 concurrent clients: isolation, crash containment, RSS/fd, teardown
+python3 scripts/stress_loop.py [binary] [rounds]            # unattended loop: 100 snapshot restores + 100 launch/kill cycles, no leaks
 python3 scripts/dogfood_xv6.py <xv6-riscv clone> [binary]   # real kernel (clang+lld, no riscv GCC needed), + broken-boot proof
 ```
 `demo.py` reproduces: T1 reset-vector → boot sector (breakpoint, step, serial regex), T2 triple fault / hang / pvpanic /
