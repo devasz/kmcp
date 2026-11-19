@@ -70,6 +70,7 @@ python3 scripts/dogfood_smm.py [binary]           # stock SMM-capable OVMF: catc
 python3 scripts/dogfood_svm.py [binary]           # AMD SVM hypervisor fixture: VMRUN/#VMEXIT, live VMCB edit
 python3 scripts/stress_parallel.py [binary] [vms] [iters]   # 10 VMs, 10 concurrent clients: isolation, crash containment, RSS/fd, teardown
 python3 scripts/stress_loop.py [binary] [rounds]            # unattended loop: 100 snapshot restores + 100 launch/kill cycles, no leaks
+python3 scripts/dogfood_kvm_step.py [binary]                 # accel=kvm: step from a breakpoint advances (needs /dev/kvm)
 python3 scripts/dogfood_xv6.py <xv6-riscv clone> [binary]   # real kernel (clang+lld, no riscv GCC needed), + broken-boot proof
 ```
 `demo.py` reproduces: T1 reset-vector → boot sector (breakpoint, step, serial regex), T2 triple fault / hang / pvpanic /

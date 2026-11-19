@@ -204,17 +204,18 @@ impl Vm {
     /// QEMU's stub re-reports a breakpoint sitting at the resume PC instead of executing it (gdb steps over it
     /// client-side), so a bare `continue` from a breakpoint never leaves it. Single-step it out with the breakpoint lifted.
     /// ponytail: a step that times out leaves the lifted breakpoint un-reinserted; the error says so.
-    async fn step_off_breakpoint(&self, thread: Option<u32>) -> Res<()> {
+    /// Returns whether it stepped: a `step` request from a breakpoint is then already satisfied (KVM re-reports the breakpoint instead of stepping).
+    async fn step_off_breakpoint(&self, thread: Option<u32>, irq: bool) -> Res<bool> {
         let at = self.linear_pc_now(thread).await?;
         let hit = breakpoints_at(&self.breakpoints().await, at);
         if hit.is_empty() {
-            return Ok(());
+            return Ok(false);
         }
         let mut op = self.lock_stopped().await?;
         for b in &hit {
             self.rsp.request_ok(&format!("z{},{:x},{:x}", b.kind, b.addr, b.len)).await?;
         }
-        self.apply_sstep(&mut op, false).await?;
+        self.apply_sstep(&mut op, irq).await?;
         self.rsp.resume(&format!("vCont;s:{}", self.tid(thread.or(op.thread).unwrap_or(1)))).await?;
         if self.rsp.wait_stop(REQUEST_TIMEOUT).await.is_none() {
             return Err(format!("stepping off the breakpoint at {at:#x} timed out; breakpoint left lifted"));
@@ -223,13 +224,17 @@ impl Vm {
             self.rsp.request_ok(&format!("Z{},{:x},{:x}", b.kind, b.addr, b.len)).await?;
         }
         self.invalidate_caches().await;
-        Ok(())
+        Ok(true)
     }
 
     /// Start (or step) the target; returns immediately. Use `wait_for_stop`.
     pub async fn go(&self, how: Go, thread: Option<u32>) -> Res<()> {
-        if matches!(how, Go::Continue) {
-            self.step_off_breakpoint(thread).await?;
+        match how {
+            Go::Continue => {
+                self.step_off_breakpoint(thread, false).await?;
+            }
+            Go::Step { irq } if self.step_off_breakpoint(thread, irq).await? => return Ok(()),
+            _ => {}
         }
         let mut op = self.lock_stopped().await?;
         let payload = match how {
