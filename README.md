@@ -48,6 +48,9 @@ Every stop returns one bundle: regs, symbol, code at PC, new serial text, new QM
   (`OVMF_CODE.secboot`) boots. A hardware breakpoint at `0x38000` (default SMBASE `0x30000` + `0x8000`) stops on the first SMI,
   before firmware relocates SMBASE; stop contexts carry `"smm": true` (only when true), `mem` and `step` work inside SMRAM.
   Emulation only: QEMU's SMM is not a vendor chipset, and real-hardware SMM work (smm-mapper, flashing BIOS) still needs a second machine.
+- **SVM (Ring -1)**: AMD-V hypervisors can be debugged on TCG (`cpu: "max"`; TCG emulates SVM, not VMX). Break on `VMRUN`,
+  read or edit the VMCB with `mem phys=true` (e.g. drop an intercept before it runs), `step` over `VMRUN` to land in the nested
+  guest, break after it to catch the `#VMEXIT` and read `exit_code`. Known gap: host and nested-guest stops look alike (no marker yet).
 - **Attach** (`vm_attach`): needs QEMU started with `-gdb`/`-qmp`/serial sockets. `detach` resumes nothing and never kills the
   external QEMU; `kill` is refused.
 - **Safety**: argv arrays only (no shell), validated paths, per-op timeouts, bounded ring buffers. QEMU dies with the MCP:
@@ -64,6 +67,7 @@ cargo test                                   # 46 unit tests
 python3 scripts/demo.py [binary] [t1..t5 gates]   # live E2E + benchmarks, needs nasm, qemu x86_64/aarch64/riscv64
 python3 scripts/dogfood_ovmf.py [binary]          # stock edk2-ovmf: pflash, 4 GiB reset vector, real->long mode, UEFI shell
 python3 scripts/dogfood_smm.py [binary]           # stock SMM-capable OVMF: catch the first SMI out-of-band, step inside SMRAM
+python3 scripts/dogfood_svm.py [binary]           # AMD SVM hypervisor fixture: VMRUN/#VMEXIT, live VMCB edit
 python3 scripts/dogfood_xv6.py <xv6-riscv clone> [binary]   # real kernel (clang+lld, no riscv GCC needed), + broken-boot proof
 ```
 `demo.py` reproduces: T1 reset-vector → boot sector (breakpoint, step, serial regex), T2 triple fault / hang / pvpanic /
